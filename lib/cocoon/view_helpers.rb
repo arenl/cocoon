@@ -72,8 +72,15 @@ module Cocoon
         html_options[:'data-association'] = association.to_s.singularize
         html_options[:'data-associations'] = association.to_s.pluralize
 
-        new_object = create_object(f, association)
+        assoc = f.object.class.reflect_on_association(association)
+        new_object = create_object(f, association, assoc)
         html_options[:'data-template'] = CGI.escapeHTML(render_association(association, f, new_object, render_options, override_partial)).html_safe
+
+        if assoc.collection?
+          f.object.send(association).delete(new_object)
+        else
+          f.object.send("#{association}=", nil)
+        end
 
         link_to(name, '#', html_options )
       end
@@ -83,9 +90,7 @@ module Cocoon
     # `` has_many :admin_comments, class_name: "Comment", conditions: { author: "Admin" }
     # will create new Comment with author "Admin"
 
-    def create_object(f, association)
-      assoc = f.object.class.reflect_on_association(association)
-
+    def create_object(f, association, assoc)
       if assoc.class.name == "Mongoid::Relations::Metadata"
         conditions = assoc.respond_to?(:conditions) ? assoc.conditions.flatten : []
         assoc.klass.new(*conditions)
